@@ -27,7 +27,7 @@ namespace Better_NCP_Editor
             entityTreeView.AfterSelect += entityTreeView_AfterSelect;
 
             // Prevent the form from shrinking below its current size.
-            this.MinimumSize = new Size(1045, 700);  // Set minimum allowed size
+            this.MinimumSize = new Size(1194, 928);  // Set minimum allowed size
             this.FormBorderStyle = FormBorderStyle.Sizable;
 
             // Example layout using docking:
