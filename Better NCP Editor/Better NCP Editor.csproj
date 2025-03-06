@@ -6,6 +6,8 @@
     <RootNamespace>Better_NCP_Editor</RootNamespace>
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
+    <ForceDesignerDpiUnaware>true</ForceDesignerDpiUnaware>
+    <ApplicationHighDpiMode>DpiUnawareGdiScaled</ApplicationHighDpiMode>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 

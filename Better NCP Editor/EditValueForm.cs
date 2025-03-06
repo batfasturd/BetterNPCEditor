@@ -15,7 +15,8 @@ namespace Better_NCP_Editor
         {
             // Set the minimum and default size.
             this.MinimumSize = new Size(210, 120);
-
+            //this.AutoScaleDimensions = new SizeF(96F, 96F); // or your base DPI
+            this.AutoScaleMode = AutoScaleMode.Dpi;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
 

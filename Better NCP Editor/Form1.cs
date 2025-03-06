@@ -26,6 +26,7 @@ namespace Better_NCP_Editor
         public Form1()
         {
             InitializeComponent();
+            this.AutoScaleMode = AutoScaleMode.None;
             dirTreeView.AfterSelect += DirTreeView_AfterSelect;
             entityTreeView.NodeMouseDoubleClick += entityTreeView_NodeMouseDoubleClick;
             entityTreeView.AfterSelect += entityTreeView_AfterSelect;
@@ -65,6 +66,7 @@ namespace Better_NCP_Editor
             _weaponModItems = LoadItemList("weaponmoditems.json");
 
         }
+
 
         private List<String> LoadItemList(String filepath)
         {
