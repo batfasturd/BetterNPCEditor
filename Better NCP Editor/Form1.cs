@@ -18,6 +18,10 @@ namespace Better_NCP_Editor
         // In your Form1 class:
         private ToolTip customToolTip = new ToolTip();
         private TreeNode lastHoveredNode = null;
+        private List<String> _wearItems;
+        private List<String> _beltItems;
+        private List<String> _weaponModItems;
+        private Dictionary<String, String> _allItems;
 
         public Form1()
         {
@@ -27,7 +31,7 @@ namespace Better_NCP_Editor
             entityTreeView.AfterSelect += entityTreeView_AfterSelect;
 
             // Prevent the form from shrinking below its current size.
-            this.MinimumSize = new Size(1194, 928);  // Set minimum allowed size
+            this.MinimumSize = new Size(1044, 700);  // Set minimum allowed size
             this.FormBorderStyle = FormBorderStyle.Sizable;
 
             // Example layout using docking:
@@ -54,8 +58,41 @@ namespace Better_NCP_Editor
             entityTreeView.MouseMove += EntityTreeView_MouseMove;
             entityTreeView.MouseLeave += EntityTreeView_MouseLeave;
 
+            // Load the item database.
+            _wearItems = LoadItemList("wearitems.json");
+            _allItems = LoadItemDatabase("allitems.json");
+            _beltItems = LoadItemList("beltitems.json");
+            _weaponModItems = LoadItemList("weaponmoditems.json");
 
         }
+
+        private List<String> LoadItemList(String filepath)
+        {
+            try
+            {
+                return JsonListLoader.Load(filepath);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error loading JSON file: " + ex.Message);
+                return null;
+            }
+        }
+
+        private Dictionary<String,String> LoadItemDatabase(String filepath)
+        {
+            try
+            {
+                return JsonDictionaryLoader.Load(filepath);
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error loading JSON file: " + ex.Message);
+                return null;
+            }
+        }
+
         private void EntityTreeView_MouseMove(object sender, MouseEventArgs e)
         {
             int xOffset = 15;
@@ -252,7 +289,7 @@ namespace Better_NCP_Editor
                 // Enable if the selected node's Tag is a JsonArray
                 if (e.Node.Tag is JsonArray)
                 {
-                    //enableButtons = true;
+                    enableAddDelButtons = true;
                     enableImportExportButtons = true;
                 }
                 // Or if the selected node is an item in an array (its parent is a JsonArray)
@@ -260,6 +297,11 @@ namespace Better_NCP_Editor
                 {
                     enableAddDelButtons = true;
                     enableImportExportButtons = true;
+                }
+
+                if (e.Node.Text.Equals("Presets", StringComparison.OrdinalIgnoreCase))
+                {
+                    enableAddDelButtons = false;
                 }
                 // You can also add additional conditions for a "preset" node, e.g. by checking text:
                 // else if (e.Node.Text.StartsWith("Preset", StringComparison.OrdinalIgnoreCase))
@@ -301,26 +343,66 @@ namespace Better_NCP_Editor
                 valueType = typeof(bool);
             else if (int.TryParse(currentVal, out int i))
                 valueType = typeof(int);
-
-            using (EditValueForm editForm = new EditValueForm(propName, currentVal, valueType))
+            
+            String parentNodeName = "Root";
+            String grandParentNodeName = "Root";
+            List<String> comboList = null;
+            
+            if (e.Node.Parent != null)
             {
-                if (editForm.ShowDialog() == DialogResult.OK)
-                {
-                    object newVal = editForm.NewValue;
-                    string displayVal = newVal is bool ? newVal.ToString().ToLower() : newVal.ToString();
-                    e.Node.Text = $"{propName}: {displayVal}";
+                parentNodeName = e.Node.Parent.Text;
 
-                    if (e.Node.Tag is JsonNode node)
+                if (e.Node.Parent.Parent != null)
+                {
+                    grandParentNodeName = e.Node.Parent.Parent.Text;
+
+                    if (propName.Equals("ShortName", StringComparison.OrdinalIgnoreCase) && grandParentNodeName.Equals("Wear items"))
                     {
-                        JsonNode newNode = JsonValue.Create(newVal);
-                        node.ReplaceWith(newNode);
-                        e.Node.Tag = newNode;
+                        comboList = _wearItems;
                     }
-                    // Mark the file as modified.
-                    fileModified = true;
-                    btn_save.Enabled = true;
+                    else if (propName.Equals("ShortName", StringComparison.OrdinalIgnoreCase) && grandParentNodeName.Equals("Belt items"))
+                    {
+                        comboList = _beltItems;
+                    }
+
                 }
+
+                if (parentNodeName.Equals("Mods"))
+                {
+                    comboList = _weaponModItems;
+                }
+
             }
+
+
+            
+
+
+
+                using (EditValueForm editForm = new EditValueForm(propName, currentVal, valueType, comboList))
+                {
+                    if (editForm.ShowDialog() == DialogResult.OK)
+                    {
+                        object newVal = editForm.NewValue;
+                        string displayVal = newVal is bool ? newVal.ToString().ToLower() : newVal.ToString();
+                        if (_allItems.ContainsKey(displayVal))
+                        {
+                            newVal = _allItems[displayVal];
+                            displayVal = _allItems[displayVal];
+                        }
+                        e.Node.Text = $"{propName}: {displayVal}";
+
+                        if (e.Node.Tag is JsonNode node)
+                        {
+                            JsonNode newNode = JsonValue.Create(newVal);
+                            node.ReplaceWith(newNode);
+                            e.Node.Tag = newNode;
+                        }
+                        // Mark the file as modified.
+                        fileModified = true;
+                        btn_save.Enabled = true;
+                    }
+                }
 
 
         }
@@ -378,54 +460,123 @@ namespace Better_NCP_Editor
             TreeNode selected = entityTreeView.SelectedNode;
             if (selected == null)
             {
-                MessageBox.Show("Please select a node to duplicate.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Please select a node to add a new item.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
-            TreeNode parent = selected.Parent;
-            if (parent == null)
+            JsonArray targetArray = null;
+            bool duplicateExisting = false;
+
+            // If the selected node itself is an array node...
+            if (selected.Tag is JsonArray arr)
             {
-                MessageBox.Show("The selected node has no parent (cannot duplicate).", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
+                targetArray = arr;
+                duplicateExisting = false; // We'll add a new blank node
             }
-
-            // Ensure the parent's Tag is a JsonArray.
-            if (!(parent.Tag is JsonArray parentArray))
+            // Otherwise, if the selected node's parent is an array...
+            else if (selected.Parent != null && selected.Parent.Tag is JsonArray arrParent)
             {
-                MessageBox.Show("The selected node's parent is not an array node.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
+                targetArray = arrParent;
+                duplicateExisting = true; // We duplicate the selected item
             }
-
-            // Retrieve the underlying JsonNode for the selected node.
-            if (!(selected.Tag is JsonNode selectedJsonNode))
+            else
             {
-                MessageBox.Show("Selected node does not contain a valid JSON element.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("The selected node is not part of an array.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
-            // Duplicate (deep clone) the selected JsonNode.
-            JsonNode duplicate = selectedJsonNode.DeepClone();
+            JsonNode newNode;
+            if (!duplicateExisting)
+            {
+                // We're adding a new blank node to the array. 
+                // Use the selected node's text as the array name.
+                string arrayName = selected.Text.Trim();
+                if (arrayName.Equals("Wear items", StringComparison.OrdinalIgnoreCase))
+                {
+                    var obj = new JsonObject();
+                    obj["ShortName"] = "CHANGE ME";
+                    obj["SkinID (0 - default)"] = 0;
+                    newNode = obj;
+                }
+                else if (arrayName.Equals("Belt items", StringComparison.OrdinalIgnoreCase))
+                {
+                    var obj = new JsonObject();
+                    obj["ShortName"] = "CHANGE ME";
+                    obj["Amount"] = 1;
+                    obj["SkinID (0 - default)"] = 0;
+                    obj["Mods"] = new JsonArray(); // Empty array
+                    obj["Ammo"] = "";
+                    newNode = obj;
+                } else if (arrayName.Equals("List of prefabs", StringComparison.OrdinalIgnoreCase))
+                {
+                    var obj = new JsonObject();
+                    obj["Chance [0.0-100.0]"] = 100.0;
+                    obj["The path to the prefab"] = "assets/rust.ai/agents/npcplayer/humannpc/scientist/CHANGEME";
+                    newNode = obj;
+                }
+                else if (arrayName.Equals("List of items", StringComparison.OrdinalIgnoreCase))
+                {
+                    var obj = new JsonObject();
+                    obj["ShortName"] = "CHANGEME";
+                    obj["Minimum"] = 1;
+                    obj["Maximum"] = 100;
+                    obj["Chance [0.0-100.0]"] = 50.0;
+                    obj["Is this a blueprint? [true/false]"] = false;
+                    obj["SkinID (0 - default)"] = 0;
+                    obj["Name (empty - default)"] = "";
+                    newNode = obj;
+                }
+                else if (arrayName.Equals("Mods", StringComparison.OrdinalIgnoreCase))
+                {
+                    newNode = JsonValue.Create("CHANGE ME");
+                }
+                else if (arrayName.Equals("Names", StringComparison.OrdinalIgnoreCase))
+                {
+                    newNode = JsonValue.Create("CHANGE ME");
+                }
+                else
+                {
+                    // Default: create an empty string
+                    newNode = JsonValue.Create("CHANGE ME");
+                }
+            }
+            else
+            {
+                // Duplicate the selected item.
+                if (!(selected.Tag is JsonNode selectedJsonNode))
+                {
+                    MessageBox.Show("Selected node does not contain a valid JSON element.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+                newNode = selectedJsonNode.DeepClone();
+            }
 
-            // Add the duplicate to the parent's array.
-            parentArray.Add(duplicate);
+            // Add the new node to the target array.
+            targetArray.Add(newNode);
 
-            // Refresh only the parent's children.
-            parent.Nodes.Clear();
-            PopulateTreeRecursive((JsonNode)parent.Tag, parent);
-            parent.ExpandAll(); // Expand the parent and all its child nodes
+            // Determine the node representing the array.
+            // If duplicating, the array node is the selected node's parent; 
+            // otherwise it is the selected node.
+            TreeNode arrayNode = duplicateExisting ? selected.Parent : selected;
+
+            // Refresh only the children of the array node.
+            arrayNode.Nodes.Clear();
+            PopulateTreeRecursive((JsonNode)arrayNode.Tag, arrayNode);
+            arrayNode.ExpandAll();
 
             fileModified = true;
             btn_save.Enabled = true;
 
-            // Select the newly added item (last child in the parent's node collection).
-            if (parent.Nodes.Count > 0)
+            // Select the newly added item (the last child).
+            if (arrayNode.Nodes.Count > 0)
             {
-                TreeNode newSelected = parent.Nodes[parent.Nodes.Count - 1];
+                TreeNode newSelected = arrayNode.Nodes[arrayNode.Nodes.Count - 1];
                 entityTreeView.SelectedNode = newSelected;
                 newSelected.EnsureVisible();
                 entityTreeView.Focus();
             }
         }
+
 
         private void btn_entity_del_Click(object sender, EventArgs e)
         {

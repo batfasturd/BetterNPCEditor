@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -9,12 +10,15 @@ namespace Better_NCP_Editor
         public object NewValue { get; private set; }
         private Control inputControl;
 
-        public EditValueForm(string propertyName, string currentValue, Type valueType)
+        // Constructor now takes an extra parameter: parentNodeName.
+        public EditValueForm(string propertyName, string currentValue, Type valueType, List<string>? comboItems)
         {
-            // Set the minimum size.
-            this.MinimumSize = new Size(210, 150);  // Example: 300x150 pixels
-                                                    // Optionally, set the default size if you want:
-            this.ClientSize = new Size(210, 150);
+            // Set the minimum and default size.
+            this.MinimumSize = new Size(210, 120);
+
+            this.FormBorderStyle = FormBorderStyle.FixedDialog;
+            this.MaximizeBox = false;
+
             // Measure the width of the property name.
             Size keySize = TextRenderer.MeasureText(propertyName, this.Font);
 
@@ -27,14 +31,13 @@ namespace Better_NCP_Editor
             }
             else
             {
-                inputWidth = TextRenderer.MeasureText(currentValue, this.Font).Width + 20;
+                inputWidth = TextRenderer.MeasureText(currentValue, this.Font).Width + 40;
             }
 
             // Determine the desired width: the maximum of the key width and input width, plus extra padding.
             int desiredWidth = Math.Max(keySize.Width, inputWidth) + 40;
-
-            // Set the form's client size (you can also set MinimumSize here if needed).
             this.ClientSize = new Size(desiredWidth, 120);
+
             this.Text = $"Edit {propertyName}";
             this.StartPosition = FormStartPosition.CenterParent;
 
@@ -47,32 +50,79 @@ namespace Better_NCP_Editor
             };
             this.Controls.Add(lblProperty);
 
-            // Create the input control with width based on desiredWidth minus margins.
             int controlWidth = desiredWidth - 20;
-            if (valueType == typeof(bool))
+
+            // Check if we need to use a special ComboBox (for "ShortName" in "Wear items").
+            if (comboItems != null)
             {
                 ComboBox combo = new ComboBox()
                 {
                     Location = new Point(10, 40),
-                    Width = controlWidth,
+                    Width = controlWidth,  // initial width based on desiredWidth minus margins
                     DropDownStyle = ComboBoxStyle.DropDownList
                 };
-                combo.Items.Add("true");
-                combo.Items.Add("false");
-                combo.SelectedItem = currentValue;
+
+                int maxWidth = 0;
+                foreach (var key in comboItems)
+                {
+                    combo.Items.Add(key);
+                    // Measure each item's width using the ComboBox's font.
+                    Size itemSize = TextRenderer.MeasureText(key, combo.Font);
+                    if (itemSize.Width > maxWidth)
+                        maxWidth = itemSize.Width;
+                }
+
+                // Optionally add some extra padding.
+                int paddedWidth = maxWidth + 20;
+
+                // Set the DropDownWidth to ensure items are fully visible.
+                combo.DropDownWidth = paddedWidth;
+
+                // Optionally, you can also adjust the combo's Width if you want it to match the dropdown width.
+                if (combo.Width < paddedWidth)
+                    combo.Width = paddedWidth;
+
+                // Set selected item to currentValue if found, otherwise select the first item.
+                if (comboItems.Contains(currentValue))
+                {
+                    combo.SelectedItem = currentValue;
+                }
+                else if (combo.Items.Count > 0)
+                {
+                    combo.SelectedIndex = 0;
+                }
+
                 inputControl = combo;
                 this.Controls.Add(combo);
             }
             else
             {
-                TextBox txtBox = new TextBox()
+                // Create the input control normally.
+                if (valueType == typeof(bool))
                 {
-                    Location = new Point(10, 40),
-                    Width = controlWidth,
-                    Text = currentValue
-                };
-                inputControl = txtBox;
-                this.Controls.Add(txtBox);
+                    ComboBox combo = new ComboBox()
+                    {
+                        Location = new Point(10, 40),
+                        Width = controlWidth,
+                        DropDownStyle = ComboBoxStyle.DropDownList
+                    };
+                    combo.Items.Add("true");
+                    combo.Items.Add("false");
+                    combo.SelectedItem = currentValue;
+                    inputControl = combo;
+                    this.Controls.Add(combo);
+                }
+                else
+                {
+                    TextBox txtBox = new TextBox()
+                    {
+                        Location = new Point(10, 40),
+                        Width = controlWidth,
+                        Text = currentValue
+                    };
+                    inputControl = txtBox;
+                    this.Controls.Add(txtBox);
+                }
             }
 
             // OK button.
@@ -91,24 +141,31 @@ namespace Better_NCP_Editor
             Button btnCancel = new Button()
             {
                 Text = "Cancel",
-                Location = new Point(100, 80),  // Positioned to the right of OK.
+                Location = new Point(100, 80),
                 Size = new Size(80, 25),
                 DialogResult = DialogResult.Cancel,
                 Anchor = AnchorStyles.Left | AnchorStyles.Bottom
             };
             this.Controls.Add(btnCancel);
+
+            this.AcceptButton = btnOk;
+            this.CancelButton = btnCancel;
         }
 
         private void BtnOk_Click(object sender, EventArgs e)
         {
-            // Determine new value based on input control.
-            if (inputControl is ComboBox combo)
+            // If the input control is the special ComboBox, return the dictionary value.
+            if (inputControl is ComboBox combo && combo.DropDownStyle == ComboBoxStyle.DropDownList &&
+                combo.Items.Count > 0)
             {
-                NewValue = combo.SelectedItem.ToString() == "true";
+                NewValue = combo.SelectedItem.ToString();
+            }
+            else if (inputControl is ComboBox comboBool)
+            {
+                NewValue = comboBool.SelectedItem.ToString() == "true";
             }
             else if (inputControl is TextBox txt)
             {
-                // Try to parse an integer; if it fails, treat it as a string.
                 if (int.TryParse(txt.Text, out int intValue))
                     NewValue = intValue;
                 else
