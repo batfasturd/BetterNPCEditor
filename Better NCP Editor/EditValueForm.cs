@@ -11,7 +11,7 @@ namespace Better_NCP_Editor
         private Control inputControl;
 
         // Constructor now takes an extra parameter: parentNodeName.
-        public EditValueForm(string propertyName, string currentValue, Type valueType, List<string>? comboItems)
+        public EditValueForm(string propertyName, string currentValue, Type valueType, List<string>? comboItems,Dictionary<String,String> allItems)
         {
             // Set the minimum and default size.
             this.MinimumSize = new Size(210, 120);
@@ -84,9 +84,10 @@ namespace Better_NCP_Editor
                     combo.Width = paddedWidth;
 
                 // Set selected item to currentValue if found, otherwise select the first item.
-                if (comboItems.Contains(currentValue))
+                var matchingPair = allItems.FirstOrDefault(x => x.Value == currentValue);
+                if (matchingPair.Key != null)
                 {
-                    combo.SelectedItem = currentValue;
+                    combo.SelectedItem = matchingPair.Key;
                 }
                 else if (combo.Items.Count > 0)
                 {

@@ -381,7 +381,7 @@ namespace Better_NCP_Editor
 
 
 
-                using (EditValueForm editForm = new EditValueForm(propName, currentVal, valueType, comboList))
+                using (EditValueForm editForm = new EditValueForm(propName, currentVal, valueType, comboList, _allItems))
                 {
                     if (editForm.ShowDialog() == DialogResult.OK)
                     {
