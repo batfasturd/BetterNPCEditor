@@ -16,27 +16,36 @@ namespace Better_NCP_Editor
             // Set the minimum and default size.
             this.MinimumSize = new Size(210, 120);
             //this.AutoScaleDimensions = new SizeF(96F, 96F); // or your base DPI
-            this.AutoScaleMode = AutoScaleMode.Dpi;
+            this.AutoScaleMode = AutoScaleMode.None;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
 
             // Measure the width of the property name.
-            Size keySize = TextRenderer.MeasureText(propertyName, this.Font);
+            int propertyNameWidth = TextRenderer.MeasureText(propertyName, this.Font).Width;
 
-            // Determine the width required for the input control.
-            int inputWidth = 0;
-            if (valueType == typeof(bool))
+            // For non-bool types, measure the current value width.
+            int currentValueWidth = valueType == typeof(bool)
+                ? TextRenderer.MeasureText("false", this.Font).Width + 30
+                : TextRenderer.MeasureText(currentValue, this.Font).Width + 40;
+
+            // If combo items are provided, determine the maximum width needed for them.
+            int comboItemsWidth = 0;
+            if (comboItems != null)
             {
-                // For a boolean, we'll use the longer of "true" or "false" plus padding.
-                inputWidth = TextRenderer.MeasureText("false", this.Font).Width + 30;
-            }
-            else
-            {
-                inputWidth = TextRenderer.MeasureText(currentValue, this.Font).Width + 40;
+                foreach (var item in comboItems)
+                {
+                    int itemWidth = TextRenderer.MeasureText(item, this.Font).Width;
+                    if (itemWidth > comboItemsWidth)
+                        comboItemsWidth = itemWidth;
+                }
+                // Add padding for the dropdown arrow and some extra margin.
+                comboItemsWidth += 20;
             }
 
-            // Determine the desired width: the maximum of the key width and input width, plus extra padding.
-            int desiredWidth = Math.Max(keySize.Width, inputWidth) + 40;
+            // Determine the desired width by taking the maximum of the measured values and adding extra margins.
+            int desiredWidth = Math.Max(propertyNameWidth, Math.Max(currentValueWidth, comboItemsWidth)) + 40;
+
+            // Set the client size based on the desired width.
             this.ClientSize = new Size(desiredWidth, 120);
 
             this.Text = $"Edit {propertyName}";

@@ -357,16 +357,32 @@ namespace Better_NCP_Editor
                 if (e.Node.Parent.Parent != null)
                 {
                     grandParentNodeName = e.Node.Parent.Parent.Text;
-
+                    // Populate wear items list
                     if (propName.Equals("ShortName", StringComparison.OrdinalIgnoreCase) && grandParentNodeName.Equals("Wear items"))
                     {
                         comboList = _wearItems;
                     }
+                    // Populate belt item list
                     else if (propName.Equals("ShortName", StringComparison.OrdinalIgnoreCase) && grandParentNodeName.Equals("Belt items"))
                     {
                         comboList = _beltItems;
                     }
-
+                    // Populate belt item list
+                    else if (propName.Equals("ShortName", StringComparison.OrdinalIgnoreCase) && grandParentNodeName.Equals("List of items"))
+                    {
+                        // Populate all items
+                        comboList = new List<String>(_allItems.Keys);
+                    }
+                    // Populate skin ids for wear items
+                    else if (propName.Equals("SkinID (0 - default)",StringComparison.OrdinalIgnoreCase) && grandParentNodeName.Equals("Wear items"))
+                    {
+                        // load the list here
+                    }
+                    // Populate skin ids for belt items
+                    else if (propName.Equals("SkinID (0 - default)", StringComparison.OrdinalIgnoreCase) && grandParentNodeName.Equals("Belt items"))
+                    {
+                        // load the list here
+                    }
                 }
 
                 if (parentNodeName.Equals("Mods"))
