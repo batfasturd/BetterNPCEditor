@@ -15,12 +15,17 @@ namespace Better_NCP_Editor
         private bool fileModified = false;
         private ToolTips toolTips = new ToolTips();
 
-        // In your Form1 class:
         private ToolTip customToolTip = new ToolTip();
         private TreeNode lastHoveredNode = null;
+
+        // Lists for item dropdowns
         private List<String> _wearItems;
         private List<String> _beltItems;
         private List<String> _weaponModItems;
+
+        private Dictionary<String, Dictionary<String,UInt64>> _itemShortnameToSkinName;
+
+        // All items dictionary.
         private Dictionary<String, String> _allItems;
 
         public Form1()
@@ -64,6 +69,7 @@ namespace Better_NCP_Editor
             _allItems = LoadItemDatabase("allitems.json");
             _beltItems = LoadItemList("beltitems.json");
             _weaponModItems = LoadItemList("weaponmoditems.json");
+            _itemShortnameToSkinName = LoadSkinDict("skins.json");
 
         }
 
@@ -87,6 +93,19 @@ namespace Better_NCP_Editor
             {
                 return JsonDictionaryLoader.Load(filepath);
 
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error loading JSON file: " + ex.Message);
+                return null;
+            }
+        }
+
+        private Dictionary<String,Dictionary<String, UInt64>> LoadSkinDict(String filepath)
+        {
+            try
+            {
+                return JsonDictionaryLoader.LoadSkinDict(filepath);
             }
             catch (Exception ex)
             {
