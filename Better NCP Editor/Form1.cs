@@ -273,7 +273,31 @@ namespace Better_NCP_Editor
                     {
                         child = new TreeNode(kvp.Key);
                     }
+                    // Set the tooltip using your existing tooltips dictionary.
                     child.ToolTipText = toolTips.tips.ContainsKey(kvp.Key) ? toolTips.tips[kvp.Key] : "";
+
+                    // *** New code: if this property is the SkinID property, try to update its tooltip ***
+                    if (kvp.Key.Equals("SkinID (0 - default)", StringComparison.OrdinalIgnoreCase) &&
+                        obj.ContainsKey("ShortName"))
+                    {
+                        string shortName = obj["ShortName"]?.ToString() ?? "";
+                        if (!string.IsNullOrEmpty(shortName) && _itemShortnameToSkinName != null &&
+                            _itemShortnameToSkinName.ContainsKey(shortName))
+                        {
+                            var skinMap = _itemShortnameToSkinName[shortName];
+                            if (UInt64.TryParse(kvp.Value?.ToString(), out UInt64 skinId))
+                            {
+                                // Reverse lookup: find the key (skin display name) whose value equals the skinId.
+                                string matchingDisplayName = skinMap.FirstOrDefault(pair => pair.Value == skinId).Key;
+                                if (!string.IsNullOrEmpty(matchingDisplayName))
+                                {
+                                    child.ToolTipText = matchingDisplayName;
+                                }
+                            }
+                        }
+                    }
+                    // *** End new code ***
+
                     child.Tag = kvp.Value;
                     treeNode.Nodes.Add(child);
                     PopulateTreeRecursive(kvp.Value, child);
@@ -300,6 +324,7 @@ namespace Better_NCP_Editor
             }
         }
 
+
         private void entityTreeView_AfterSelect(object sender, TreeViewEventArgs e)
         {
             if (e.Node != null)
@@ -324,11 +349,6 @@ namespace Better_NCP_Editor
                 {
                     enableAddDelButtons = false;
                 }
-                // You can also add additional conditions for a "preset" node, e.g. by checking text:
-                // else if (e.Node.Text.StartsWith("Preset", StringComparison.OrdinalIgnoreCase))
-                // {
-                //     enableButtons = true;
-                // }
 
                 btn_entity_add.Enabled = enableAddDelButtons;
                 btn_entity_del.Enabled = enableAddDelButtons;
@@ -357,91 +377,116 @@ namespace Better_NCP_Editor
 
             string propName = parts[0].Trim();
             string currentVal = parts[1].Trim();
+            string? skinToolTip = null;
+            Type valueType = GetValueType(currentVal);
 
-            // Use simple heuristics to determine the type.
-            Type valueType = typeof(string);
-            if (bool.TryParse(currentVal, out bool b))
-                valueType = typeof(bool);
-            else if (int.TryParse(currentVal, out int i))
-                valueType = typeof(int);
-            
-            String parentNodeName = "Root";
-            String grandParentNodeName = "Root";
-            List<String> comboList = null;
-            
-            if (e.Node.Parent != null)
+            // Get any additional combo and skin lists based on the node hierarchy.
+            var (comboList, skinList, itemCurrentVal) = GetComboAndSkinLists(e.Node, propName);
+
+            using (EditValueForm editForm = new EditValueForm(propName, currentVal, valueType, comboList, _allItems, skinList))
             {
-                parentNodeName = e.Node.Parent.Text;
-
-                if (e.Node.Parent.Parent != null)
+                if (editForm.ShowDialog() == DialogResult.OK)
                 {
-                    grandParentNodeName = e.Node.Parent.Parent.Text;
-                    // Populate wear items list
-                    if (propName.Equals("ShortName", StringComparison.OrdinalIgnoreCase) && grandParentNodeName.Equals("Wear items"))
+                    object newVal = editForm.NewValue;
+                    string displayVal = newVal is bool ? newVal.ToString().ToLower() : newVal.ToString();
+
+                    if (_allItems.ContainsKey(displayVal))
                     {
+                        newVal = _allItems[displayVal];
+                        displayVal = _allItems[displayVal];
+                    }
+                    else if (!string.IsNullOrEmpty(itemCurrentVal) && _itemShortnameToSkinName.ContainsKey(itemCurrentVal))
+                    {
+                        skinToolTip = displayVal;
+                        newVal = _itemShortnameToSkinName[itemCurrentVal][displayVal];
+                        displayVal = _itemShortnameToSkinName[itemCurrentVal][displayVal].ToString();
+                    }
+
+                    if (skinToolTip != null)
+                    {
+                        e.Node.ToolTipText = skinToolTip;
+                    }
+                    e.Node.Text = $"{propName}: {displayVal}";
+
+                    if (e.Node.Tag is JsonNode node)
+                    {
+                        JsonNode newNode = JsonValue.Create(newVal);
+                        node.ReplaceWith(newNode);
+                        e.Node.Tag = newNode;
+                    }
+
+                    // Mark the file as modified.
+                    fileModified = true;
+                    btn_save.Enabled = true;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Determines the type for the current value using simple heuristics.
+        /// </summary>
+        private Type GetValueType(string currentVal)
+        {
+            if (bool.TryParse(currentVal, out _))
+                return typeof(bool);
+            if (int.TryParse(currentVal, out _))
+                return typeof(int);
+            return typeof(string);
+        }
+
+        /// <summary>
+        /// Retrieves combo list and skin dictionary based on the node's hierarchy and property name.
+        /// Returns a tuple of (comboList, skinList, itemCurrentVal).
+        /// </summary>
+        private (List<string> comboList, Dictionary<string, UInt64> skinList, string itemCurrentVal) GetComboAndSkinLists(TreeNode node, string propName)
+        {
+            List<string> comboList = null;
+            Dictionary<string, UInt64> skinList = null;
+            string itemCurrentVal = string.Empty;
+
+            if (node.Parent == null)
+                return (comboList, skinList, itemCurrentVal);
+
+            string parentNodeName = node.Parent.Text;
+            string grandParentNodeName = node.Parent.Parent?.Text ?? "Root";
+
+            // Mods override.
+            if (parentNodeName.Equals("Mods", StringComparison.OrdinalIgnoreCase))
+            {
+                comboList = _weaponModItems;
+            }
+            // Check deeper hierarchy.
+            else if (node.Parent.Parent != null)
+            {
+                if (propName.Equals("ShortName", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (grandParentNodeName.Equals("Wear items", StringComparison.OrdinalIgnoreCase))
                         comboList = _wearItems;
-                    }
-                    // Populate belt item list
-                    else if (propName.Equals("ShortName", StringComparison.OrdinalIgnoreCase) && grandParentNodeName.Equals("Belt items"))
-                    {
+                    else if (grandParentNodeName.Equals("Belt items", StringComparison.OrdinalIgnoreCase))
                         comboList = _beltItems;
-                    }
-                    // Populate belt item list
-                    else if (propName.Equals("ShortName", StringComparison.OrdinalIgnoreCase) && grandParentNodeName.Equals("List of items"))
-                    {
-                        // Populate all items
-                        comboList = new List<String>(_allItems.Keys);
-                    }
-                    // Populate skin ids for wear items
-                    else if (propName.Equals("SkinID (0 - default)",StringComparison.OrdinalIgnoreCase) && grandParentNodeName.Equals("Wear items"))
-                    {
-                        // load the list here
-                    }
-                    // Populate skin ids for belt items
-                    else if (propName.Equals("SkinID (0 - default)", StringComparison.OrdinalIgnoreCase) && grandParentNodeName.Equals("Belt items"))
-                    {
-                        // load the list here
-                    }
+                    else if (grandParentNodeName.Equals("List of items", StringComparison.OrdinalIgnoreCase))
+                        comboList = new List<string>(_allItems.Keys);
                 }
-
-                if (parentNodeName.Equals("Mods"))
+                else if (propName.Equals("SkinID (0 - default)", StringComparison.OrdinalIgnoreCase))
                 {
-                    comboList = _weaponModItems;
+                    // Expect node text in the form "Property: Value" from the first child.
+                    if (node.Parent.FirstNode != null)
+                    {
+                        string[] itemParts = node.Parent.FirstNode.Text.Split(new[] { ':' }, 2);
+                        if (itemParts.Length == 2)
+                        {
+                            itemCurrentVal = itemParts[1].Trim();
+                            if (_itemShortnameToSkinName.TryGetValue(itemCurrentVal, out var skinMap) && skinMap.Count > 0)
+                            {
+                                comboList = new List<string>(skinMap.Keys);
+                                skinList = skinMap;
+                            }
+                        }
+                    }
                 }
-
             }
 
-
-            
-
-
-
-                using (EditValueForm editForm = new EditValueForm(propName, currentVal, valueType, comboList, _allItems))
-                {
-                    if (editForm.ShowDialog() == DialogResult.OK)
-                    {
-                        object newVal = editForm.NewValue;
-                        string displayVal = newVal is bool ? newVal.ToString().ToLower() : newVal.ToString();
-                        if (_allItems.ContainsKey(displayVal))
-                        {
-                            newVal = _allItems[displayVal];
-                            displayVal = _allItems[displayVal];
-                        }
-                        e.Node.Text = $"{propName}: {displayVal}";
-
-                        if (e.Node.Tag is JsonNode node)
-                        {
-                            JsonNode newNode = JsonValue.Create(newVal);
-                            node.ReplaceWith(newNode);
-                            e.Node.Tag = newNode;
-                        }
-                        // Mark the file as modified.
-                        fileModified = true;
-                        btn_save.Enabled = true;
-                    }
-                }
-
-
+            return (comboList, skinList, itemCurrentVal);
         }
 
 
