@@ -39,6 +39,9 @@
             btn_import_entityData = new Button();
             btn_export_entityData = new Button();
             statusTextbox = new TextBox();
+            searchTextBox = new TextBox();
+            btn_Search = new Button();
+            btn_Search_Clear = new Button();
             SuspendLayout();
             // 
             // btn_load
@@ -69,7 +72,7 @@
             dirTreeView.Location = new Point(15, 40);
             dirTreeView.Margin = new Padding(3, 2, 3, 2);
             dirTreeView.Name = "dirTreeView";
-            dirTreeView.Size = new Size(254, 610);
+            dirTreeView.Size = new Size(254, 623);
             dirTreeView.TabIndex = 2;
             // 
             // entityTreeView
@@ -77,7 +80,7 @@
             entityTreeView.Location = new Point(274, 40);
             entityTreeView.Margin = new Padding(3, 2, 3, 2);
             entityTreeView.Name = "entityTreeView";
-            entityTreeView.Size = new Size(738, 610);
+            entityTreeView.Size = new Size(738, 623);
             entityTreeView.TabIndex = 3;
             // 
             // btn_entity_del
@@ -107,10 +110,10 @@
             // btn_import_entityData
             // 
             btn_import_entityData.Enabled = false;
-            btn_import_entityData.Location = new Point(431, 9);
+            btn_import_entityData.Location = new Point(366, 9);
             btn_import_entityData.Margin = new Padding(3, 2, 3, 2);
             btn_import_entityData.Name = "btn_import_entityData";
-            btn_import_entityData.Size = new Size(61, 22);
+            btn_import_entityData.Size = new Size(68, 22);
             btn_import_entityData.TabIndex = 9;
             btn_import_entityData.Text = "Import";
             btn_import_entityData.UseVisualStyleBackColor = true;
@@ -119,10 +122,10 @@
             // btn_export_entityData
             // 
             btn_export_entityData.Enabled = false;
-            btn_export_entityData.Location = new Point(498, 9);
+            btn_export_entityData.Location = new Point(440, 9);
             btn_export_entityData.Margin = new Padding(3, 2, 3, 2);
             btn_export_entityData.Name = "btn_export_entityData";
-            btn_export_entityData.Size = new Size(58, 22);
+            btn_export_entityData.Size = new Size(65, 22);
             btn_export_entityData.TabIndex = 10;
             btn_export_entityData.Text = "Export";
             btn_export_entityData.UseVisualStyleBackColor = true;
@@ -132,18 +135,50 @@
             // 
             statusTextbox.BorderStyle = BorderStyle.FixedSingle;
             statusTextbox.ImeMode = ImeMode.NoControl;
-            statusTextbox.Location = new Point(578, 10);
+            statusTextbox.Location = new Point(15, 667);
             statusTextbox.Margin = new Padding(3, 2, 3, 2);
             statusTextbox.Name = "statusTextbox";
             statusTextbox.ReadOnly = true;
-            statusTextbox.Size = new Size(434, 23);
+            statusTextbox.Size = new Size(997, 23);
             statusTextbox.TabIndex = 11;
+            // 
+            // searchTextBox
+            // 
+            searchTextBox.Location = new Point(725, 8);
+            searchTextBox.Name = "searchTextBox";
+            searchTextBox.Size = new Size(287, 23);
+            searchTextBox.TabIndex = 12;
+            // 
+            // btn_Search
+            // 
+            btn_Search.Location = new Point(605, 7);
+            btn_Search.Margin = new Padding(3, 2, 3, 2);
+            btn_Search.Name = "btn_Search";
+            btn_Search.Size = new Size(65, 22);
+            btn_Search.TabIndex = 13;
+            btn_Search.Text = "Search";
+            btn_Search.UseVisualStyleBackColor = true;
+            btn_Search.Click += btn_Search_Click;
+            // 
+            // btn_Search_Clear
+            // 
+            btn_Search_Clear.Location = new Point(676, 7);
+            btn_Search_Clear.Margin = new Padding(3, 2, 3, 2);
+            btn_Search_Clear.Name = "btn_Search_Clear";
+            btn_Search_Clear.Size = new Size(43, 22);
+            btn_Search_Clear.TabIndex = 14;
+            btn_Search_Clear.Text = "Clear";
+            btn_Search_Clear.UseVisualStyleBackColor = true;
+            btn_Search_Clear.Click += btn_Search_Clear_Click;
             // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(1028, 661);
+            ClientSize = new Size(1028, 696);
+            Controls.Add(btn_Search_Clear);
+            Controls.Add(btn_Search);
+            Controls.Add(searchTextBox);
             Controls.Add(statusTextbox);
             Controls.Add(btn_export_entityData);
             Controls.Add(btn_import_entityData);
@@ -155,7 +190,7 @@
             Controls.Add(btn_load);
             Margin = new Padding(3, 2, 3, 2);
             Name = "Form1";
-            Text = "BetterNPC Editor V1.0";
+            Text = "BetterNPC";
             Load += Form1_Load;
             ResumeLayout(false);
             PerformLayout();
@@ -172,5 +207,8 @@
         private Button btn_import_entityData;
         private Button btn_export_entityData;
         private TextBox statusTextbox;
+        private TextBox searchTextBox;
+        private Button btn_Search;
+        private Button btn_Search_Clear;
     }
 }

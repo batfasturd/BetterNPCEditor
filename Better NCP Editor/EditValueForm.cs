@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using System.Globalization;
 
 namespace Better_NCP_Editor
 {
@@ -188,21 +189,14 @@ namespace Better_NCP_Editor
 
         private void BtnOk_Click(object sender, EventArgs e)
         {
-            // Determine the new value based on the type of the input control.
             if (inputControl is ComboBox combo)
             {
                 if (valueType == typeof(bool))
                 {
-                    // Parse the selected string to a boolean.
                     if (bool.TryParse(combo.SelectedItem?.ToString(), out bool boolVal))
-                    {
                         NewValue = boolVal;
-                    }
                     else
-                    {
-                        // Handle parsing error as needed.
                         NewValue = false;
-                    }
                 }
                 else
                 {
@@ -212,11 +206,32 @@ namespace Better_NCP_Editor
             }
             else if (inputControl is TextBox txt)
             {
-                // If possible, parse to int; otherwise, leave as string.
-                if (int.TryParse(txt.Text, out int intValue))
+                // Parse the value based on the expected type using invariant culture.
+                if (valueType == typeof(int) &&
+                    int.TryParse(txt.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int intValue))
+                {
                     NewValue = intValue;
+                }
+                else if (valueType == typeof(double) &&
+                         double.TryParse(txt.Text, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out double doubleValue))
+                {
+                    NewValue = doubleValue;
+                }
+                else if (valueType == typeof(float) &&
+                         float.TryParse(txt.Text, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out float floatValue))
+                {
+                    NewValue = floatValue;
+                }
+                else if (valueType == typeof(bool) &&
+                         bool.TryParse(txt.Text, out bool boolValue))
+                {
+                    NewValue = boolValue;
+                }
                 else
+                {
+                    // Default to string if parsing fails.
                     NewValue = txt.Text;
+                }
             }
             this.DialogResult = DialogResult.OK;
             this.Close();

@@ -5,11 +5,14 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization.Metadata;
 using System.Windows.Forms;
+using System.Globalization;
 
 namespace Better_NCP_Editor
 {
     public partial class Form1 : Form
     {
+        private const string formTitle = "Better NCP Editor";
+        private const string version = "0.0.2-alpha";
         private string currentJsonFilePath;
         private JsonNode currentJson;
         private bool fileModified = false;
@@ -23,7 +26,7 @@ namespace Better_NCP_Editor
         private List<String> _beltItems;
         private List<String> _weaponModItems;
 
-        private Dictionary<String, Dictionary<String,UInt64>> _itemShortnameToSkinName;
+        private Dictionary<String, Dictionary<String, UInt64>> _itemShortnameToSkinName;
 
         // All items dictionary.
         private Dictionary<String, String> _allItems;
@@ -31,13 +34,16 @@ namespace Better_NCP_Editor
         public Form1()
         {
             InitializeComponent();
+            this.Text = $"{formTitle} v{version}";
             this.AutoScaleMode = AutoScaleMode.None;
             dirTreeView.AfterSelect += DirTreeView_AfterSelect;
             entityTreeView.NodeMouseDoubleClick += entityTreeView_NodeMouseDoubleClick;
             entityTreeView.AfterSelect += entityTreeView_AfterSelect;
 
+            searchTextBox.KeyDown += SearchTextBox_KeyDown;
+
             // Prevent the form from shrinking below its current size.
-            this.MinimumSize = new Size(1044, 700);  // Set minimum allowed size
+            this.MinimumSize = new Size(1044, 735);  // Set minimum allowed size
             this.FormBorderStyle = FormBorderStyle.Sizable;
 
             // Example layout using docking:
@@ -50,6 +56,7 @@ namespace Better_NCP_Editor
             // In the designer or constructor:
             dirTreeView.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
             entityTreeView.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            statusTextbox.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             entityTreeView.ShowNodeToolTips = false;
 
             // Configure the custom tooltip.
@@ -87,7 +94,7 @@ namespace Better_NCP_Editor
             }
         }
 
-        private Dictionary<String,String> LoadItemDatabase(String filepath)
+        private Dictionary<String, String> LoadItemDatabase(String filepath)
         {
             try
             {
@@ -101,7 +108,7 @@ namespace Better_NCP_Editor
             }
         }
 
-        private Dictionary<String,Dictionary<String, UInt64>> LoadSkinDict(String filepath)
+        private Dictionary<String, Dictionary<String, UInt64>> LoadSkinDict(String filepath)
         {
             try
             {
@@ -265,9 +272,11 @@ namespace Better_NCP_Editor
                 foreach (var kvp in obj)
                 {
                     TreeNode child;
-                    if (kvp.Value is JsonValue)
+                    if (kvp.Value is JsonValue jsonValue)
                     {
-                        child = new TreeNode($"{kvp.Key}: {kvp.Value}");
+                        // Format the value properly based on its type
+                        string displayValue = FormatJsonValueForDisplay(jsonValue);
+                        child = new TreeNode($"{kvp.Key}: {displayValue}");
                     }
                     else
                     {
@@ -309,9 +318,11 @@ namespace Better_NCP_Editor
                 {
                     JsonNode item = arr[i];
                     TreeNode child;
-                    if (item is JsonValue)
+                    if (item is JsonValue jsonValue)
                     {
-                        child = new TreeNode($"[{i}]: {item}");
+                        // Format the value properly based on its type
+                        string displayValue = FormatJsonValueForDisplay(jsonValue);
+                        child = new TreeNode($"[{i}]: {displayValue}");
                     }
                     else
                     {
@@ -321,6 +332,31 @@ namespace Better_NCP_Editor
                     treeNode.Nodes.Add(child);
                     PopulateTreeRecursive(item, child);
                 }
+            }
+        }
+
+        // Helper method to properly format JSON values for display
+        private string FormatJsonValueForDisplay(JsonValue jsonValue)
+        {
+            try
+            {
+                // Get the underlying value
+                object value = jsonValue.GetValue<object>();
+
+                if (value is double doubleVal)
+                    return doubleVal.ToString(CultureInfo.InvariantCulture);
+                else if (value is float floatVal)
+                    return floatVal.ToString(CultureInfo.InvariantCulture);
+                else if (value is bool boolVal)
+                    return boolVal.ToString().ToLowerInvariant(); // Display as lowercase true/false
+                else if (value is string str)
+                    return str; // Return the raw string without quotes.
+                else
+                    return jsonValue.ToString(); // Default fallback.
+            }
+            catch
+            {
+                return jsonValue.ToString();
             }
         }
 
@@ -429,8 +465,12 @@ namespace Better_NCP_Editor
         {
             if (bool.TryParse(currentVal, out _))
                 return typeof(bool);
-            if (int.TryParse(currentVal, out _))
+            if (int.TryParse(currentVal, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
                 return typeof(int);
+            if (float.TryParse(currentVal, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out _))
+                return typeof(float);
+            if (double.TryParse(currentVal, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out _))
+                return typeof(double);
             return typeof(string);
         }
 
@@ -589,7 +629,8 @@ namespace Better_NCP_Editor
                     obj["Mods"] = new JsonArray(); // Empty array
                     obj["Ammo"] = "";
                     newNode = obj;
-                } else if (arrayName.Equals("List of prefabs", StringComparison.OrdinalIgnoreCase))
+                }
+                else if (arrayName.Equals("List of prefabs", StringComparison.OrdinalIgnoreCase))
                 {
                     var obj = new JsonObject();
                     obj["Chance [0.0-100.0]"] = 100.0;
@@ -943,6 +984,156 @@ namespace Better_NCP_Editor
                         MessageBox.Show($"Error exporting JSON: {ex.Message}", "Export Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
+            }
+        }
+
+        private void btn_Search_Click(object sender, EventArgs e)
+        {
+            string searchText = searchTextBox.Text.Trim().ToLowerInvariant();
+
+            if (string.IsNullOrEmpty(searchText))
+            {
+                // If search text is empty, restore the full tree view
+                if (currentJson != null)
+                {
+                    PopulateEntityTree(currentJson);
+                    statusTextbox.Text = "Search cleared. Displaying all nodes.";
+                }
+                return;
+            }
+
+            if (currentJson == null)
+            {
+                statusTextbox.Text = "No JSON file loaded to search.";
+                return;
+            }
+
+            // Clear the tree view before repopulating with filtered results
+            entityTreeView.Nodes.Clear();
+
+            // Get the filename for the root node
+            string fileName = string.IsNullOrEmpty(currentJsonFilePath) ? "JSON" : Path.GetFileName(currentJsonFilePath);
+            TreeNode rootNode = new TreeNode(fileName)
+            {
+                Tag = currentJson
+            };
+            entityTreeView.Nodes.Add(rootNode);
+
+            // Use a flag to track if any matches were found
+            bool foundMatches = SearchAndPopulateTree(currentJson, rootNode, searchText);
+
+            if (foundMatches)
+            {
+                rootNode.ExpandAll();
+                statusTextbox.Text = $"Search complete. Showing results for: '{searchText}'";
+            }
+            else
+            {
+                // No matches found
+                PopulateEntityTree(currentJson); // Restore the full tree
+                statusTextbox.Text = $"No matches found for: '{searchText}'";
+            }
+        }
+
+        private bool SearchAndPopulateTree(JsonNode node, TreeNode treeNode, string searchText)
+        {
+            bool foundMatch = false;
+
+            if (node is JsonObject obj)
+            {
+                foreach (var kvp in obj)
+                {
+                    bool keyMatch = kvp.Key.ToLowerInvariant().Contains(searchText);
+                    bool valueMatch = false;
+                    TreeNode child;
+
+                    if (kvp.Value is JsonValue jsonValue)
+                    {
+                        string displayValue = FormatJsonValueForDisplay(jsonValue);
+                        string valueStr = jsonValue.ToString().ToLowerInvariant();
+                        valueMatch = valueStr.Contains(searchText);
+                        child = new TreeNode($"{kvp.Key}: {displayValue}");
+                    }
+                    else
+                    {
+                        child = new TreeNode(kvp.Key);
+                    }
+
+                    child.ToolTipText = toolTips.tips.ContainsKey(kvp.Key) ? toolTips.tips[kvp.Key] : "";
+                    child.Tag = kvp.Value;
+
+                    if (keyMatch || valueMatch)
+                    {
+                        // Direct match found:
+                        // Add the full subtree without filtering.
+                        PopulateTreeRecursive(kvp.Value, child);
+                        treeNode.Nodes.Add(child);
+                        foundMatch = true;
+                    }
+                    else
+                    {
+                        // No direct match: continue filtering the children.
+                        bool childrenMatch = SearchAndPopulateTree(kvp.Value, child, searchText);
+                        if (childrenMatch)
+                        {
+                            treeNode.Nodes.Add(child);
+                            foundMatch = true;
+                        }
+                    }
+                }
+            }
+            else if (node is JsonArray arr)
+            {
+                for (int i = 0; i < arr.Count; i++)
+                {
+                    JsonNode item = arr[i];
+                    TreeNode child;
+
+                    if (item is JsonValue jsonValue)
+                    {
+                        string displayValue = FormatJsonValueForDisplay(jsonValue);
+                        string valueStr = jsonValue.ToString().ToLowerInvariant();
+                        bool valueMatch = valueStr.Contains(searchText);
+                        child = new TreeNode($"[{i}]: {displayValue}");
+
+                        if (valueMatch)
+                        {
+                            child.BackColor = Color.LightYellow;
+                            treeNode.Nodes.Add(child);
+                            foundMatch = true;
+                        }
+                    }
+                    else
+                    {
+                        child = new TreeNode($"[{i}]");
+                        child.Tag = item;
+                        bool childrenMatch = SearchAndPopulateTree(item, child, searchText);
+                        if (childrenMatch)
+                        {
+                            treeNode.Nodes.Add(child);
+                            foundMatch = true;
+                        }
+                    }
+                }
+            }
+            return foundMatch;
+        }
+
+        private void btn_Search_Clear_Click(object sender, EventArgs e)
+        {
+            searchTextBox.Clear();
+            btn_Search_Click(sender, e);
+        }
+
+        private void SearchTextBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                // Prevent the beep sound
+                e.SuppressKeyPress = true;
+
+                // Trigger the search button click
+                btn_Search_Click(sender, EventArgs.Empty);
             }
         }
     }
